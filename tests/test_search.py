@@ -89,8 +89,34 @@ def test_matching_files_passes_one_file_system_to_ripgrep(tmp_path, monkeypatch)
     assert calls[0][-2:] == ["needle", str(tmp_path)]
 
 
+def test_matching_files_excludes_pseudo_mounts_when_searching_root(monkeypatch):
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        return subprocess.CompletedProcess(args, 1)
+
+    monkeypatch.setattr(search.shutil, "which", lambda name: "/fake/rg")
+    monkeypatch.setattr(search.subprocess, "run", fake_run)
+
+    with search.matching_files("needle", "/", show_hidden=False) as matches:
+        assert matches("anything") is False
+
+    for name in ("dev", "proc", "sys"):
+        assert ["--glob", f"!{name}/**"] in [calls[0][i:i + 2] for i in range(len(calls[0]) - 1)]
+
+
+@pytest.mark.skipif(not os.path.isdir("/dev"), reason="requires /dev")
+def test_matching_files_uses_safe_fallback_for_pseudo_filesystem_root(monkeypatch):
+    monkeypatch.setattr(search.shutil, "which", lambda name: "/fake/rg")
+    monkeypatch.setattr(search.subprocess, "run", lambda *args, **kwargs: pytest.fail("ripgrep must not run on /dev"))
+
+    with search.matching_files("needle", "/dev", show_hidden=False) as matches:
+        assert matches is None
+
+
 @pytest.mark.skipif(shutil.which("rg") is None, reason="ripgrep not installed")
-def test_matching_files_finds_files_with_ripgrep(tmp_path):
+def test_matching_files_finds_files_with_ripgrep(tmp_path, monkeypatch):
     hit, miss = tmp_path / "hit.txt", tmp_path / "miss.txt"
     hit.write_text("a Needle here")
     miss.write_text("nothing")

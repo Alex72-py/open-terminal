@@ -11,6 +11,9 @@ import tempfile
 from open_terminal.utils.limits import CHUNK_SIZE
 
 
+_PSEUDO_FILESYSTEMS = ("/dev", "/proc", "/sys")
+
+
 def is_regular_file(path):
     """True only for regular files; reading devices, FIFOs or sockets can block forever."""
     try:
@@ -24,6 +27,12 @@ def _device(path):
         return os.lstat(path).st_dev
     except OSError:
         return None
+
+
+def _is_pseudo_filesystem(path):
+    """Avoid handing pseudo-filesystem trees (notably /dev) to ripgrep."""
+    path = os.path.realpath(path)
+    return any(path == mount or path.startswith(mount + os.sep) for mount in _PSEUDO_FILESYSTEMS)
 
 
 def walk_entries(fs, root, show_hidden=True):
@@ -97,12 +106,22 @@ def search_entries(fs, root, show_hidden=False, *, git_files_as_files=False):
 @contextmanager
 def matching_files(query, root, show_hidden):
     """Use rg's ignore rules without its potentially enormous JSON submatch arrays."""
+    # --one-file-system protects a search rooted at / from crossing into /dev on typical
+    # Linux hosts, but it cannot help when /dev itself is the requested root. In that case
+    # use the guarded Python fallback, which opens only regular files.
+    if _is_pseudo_filesystem(root):
+        yield None
+        return
     rg = shutil.which("rg")
     if not rg:
         yield None
         return
     with tempfile.TemporaryFile() as output:
         args = [rg, "--files-with-matches", "--null", "--no-messages", "--fixed-strings", "--ignore-case", "--one-file-system"]
+        if os.path.realpath(root) == os.path.sep:
+            # Also exclude these mount points if a container happens to report the same st_dev.
+            for name in ("dev", "proc", "sys"):
+                args.extend(["--glob", f"!{name}/**"])
         if show_hidden:
             args.append("--hidden")
         try:
