@@ -4,17 +4,36 @@ import json
 import os
 import shutil
 import sqlite3
+import stat
 import subprocess
 import tempfile
 
 from open_terminal.utils.limits import CHUNK_SIZE
 
 
+def is_regular_file(path):
+    """True only for regular files; reading devices, FIFOs or sockets can block forever."""
+    try:
+        return stat.S_ISREG(os.stat(path).st_mode)
+    except OSError:
+        return False
+
+
+def _device(path):
+    try:
+        return os.lstat(path).st_dev
+    except OSError:
+        return None
+
+
 def walk_entries(fs, root, show_hidden=True):
+    # Stay on the root's filesystem so pseudo-filesystems such as /dev, /proc and /sys are skipped.
+    root_device = _device(root)
     for directory, dirs, files in os.walk(root):
         dirs[:] = [name for name in sorted(dirs)
                    if (show_hidden or not name.startswith("."))
-                   and fs.is_path_allowed(os.path.join(directory, name))]
+                   and fs.is_path_allowed(os.path.join(directory, name))
+                   and _device(os.path.join(directory, name)) in (root_device, None)]
         for name, kind in sorted([(name, "directory") for name in dirs] + [(name, "file") for name in files]):
             path = os.path.join(directory, name)
             if (show_hidden or not name.startswith(".")) and fs.is_path_allowed(path):
@@ -83,7 +102,7 @@ def matching_files(query, root, show_hidden):
         yield None
         return
     with tempfile.TemporaryFile() as output:
-        args = [rg, "--files-with-matches", "--null", "--no-messages", "--fixed-strings", "--ignore-case"]
+        args = [rg, "--files-with-matches", "--null", "--no-messages", "--fixed-strings", "--ignore-case", "--one-file-system"]
         if show_hidden:
             args.append("--hidden")
         try:
