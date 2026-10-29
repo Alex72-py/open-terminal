@@ -9,6 +9,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Fixed file search getting stuck when the search folder contains `/dev`, for example when the file browser root is the whole filesystem. Search now stays on the starting folder's filesystem, so `/dev`, `/proc` and `/sys` are skipped, and only regular files are ever opened, so device files can no longer block it.
+## [0.14.6] - 2026-10-29
+
+### Fixed
+
+- Updated the default assistant instructions to present created or edited files through Open WebUI's file viewer before finishing a reply. This addresses replies that showed labels such as "Download PDF" and "Editable Word version" without working download links. Custom assistant instructions must be updated separately to include this guidance.
+
+## [0.14.5] - 2026-10-25
+
+### Added
+
+- `open-terminal run --cftunnel` publishes a temporary Cloudflare HTTPS endpoint with a required configured API key. Reuses installed cloudflared or offers a pinned, checksum-verified download; `--yes` approves unattended downloads. The API and connector shut down together.
+
+### Fixed
+
+- CLI launches using `OPEN_TERMINAL_API_KEY_FILE` no longer leave conflicting API-key environment settings. Explicit `--api-key` overrides environment sources.
+- Malformed REST and terminal WebSocket credentials are rejected without authentication-handler exceptions.
+
 ## [0.14.4] - 2026-10-24
 
 ### Added
