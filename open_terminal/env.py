@@ -3,6 +3,14 @@ import os
 from open_terminal import config
 
 
+def sanitized_environ(extra: dict[str, str] | None = None) -> dict[str, str]:
+    """Exclude inherited server settings; explicit command overrides still win."""
+    env = {key: value for key, value in os.environ.items() if not key.startswith("OPEN_TERMINAL_")}
+    if extra:
+        env.update(extra)
+    return env
+
+
 def _resolve_file_env(var: str, default: str = "") -> str:
     """Resolve an environment variable with Docker-secrets ``_FILE`` support.
 
@@ -155,6 +163,14 @@ UVICORN_LOOP = os.environ.get(
     "OPEN_TERMINAL_UVICORN_LOOP",
     config.get("uvicorn_loop", "auto"),
 )
+
+UVICORN_TIMEOUT_KEEP_ALIVE: float | None = None
+_uvicorn_timeout_keep_alive = os.environ.get(
+    "OPEN_TERMINAL_UVICORN_TIMEOUT_KEEP_ALIVE",
+    config.get("uvicorn_timeout_keep_alive"),
+)
+if _uvicorn_timeout_keep_alive is not None:
+    UVICORN_TIMEOUT_KEEP_ALIVE = float(_uvicorn_timeout_keep_alive)
 
 OPEN_TERMINAL_INFO = os.environ.get(
     "OPEN_TERMINAL_INFO",
