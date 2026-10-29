@@ -98,7 +98,6 @@ def run(
     cwd: str | None,
     api_key: str,
     cors_allowed_origins: str | None,
-    cors_allowed_origins: str,
     cftunnel: bool,
     yes: bool,
 ):
